@@ -523,6 +523,28 @@ fn main() -> Result<(), InputError> {
                 );
             }
         },
+        Commands::View { package, lib_dir } => {
+            let atoms = get_atoms(&lib_dir);
+            let atom = atoms.iter()
+                .find(|a| a.name.as_str() == package.as_str())
+                .expect_or_exit(
+                    &format!("No Package exists with name {}", package.as_str())
+                );
+
+            println!("Name: {}", atom.name.as_str());
+            if let Some(val) = &atom.description {
+                println!("Description: {}", val);
+            }
+            if let Some(val) = &atom.version {
+                println!("Version: {}", val);
+            }
+            if let Some(val) = &atom.architecture {
+                println!("Architecture: {}", val);
+            }
+            if let Some(val) = &atom.maintainer {
+                println!("Maintainer: {}", val);
+            }
+        }
         Commands::Tag { package, group, lib_dir } => {
             let mut group = get_group(&lib_dir, &group);
             

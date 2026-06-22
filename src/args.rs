@@ -64,6 +64,11 @@ pub enum Commands {
     GetDeb {
         packages: Vec<String>,
     },
+    View {
+        package: String,
+        #[arg(long, default_value = "/var/lib/tower")]
+        lib_dir: String,
+    },
     Tag {
         package: String,
         group: String,
