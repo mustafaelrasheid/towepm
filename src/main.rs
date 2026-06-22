@@ -544,7 +544,7 @@ fn main() -> Result<(), InputError> {
             if let Some(val) = &atom.maintainer {
                 println!("Maintainer: {}", val);
             }
-        }
+        },
         Commands::Tag { package, group, lib_dir } => {
             let mut group = get_group(&lib_dir, &group);
             
