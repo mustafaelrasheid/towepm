@@ -1,6 +1,6 @@
 # Tower
-Tower is a package manager meant for flattening out complex dependancy graphs
-that other package managers try to use to reduce size.
+A package manager meant for flattening out complex dependency graphs to a
+simpler but larger format.
 
 On more information on how to use tower, you can try installing the software
 and running it with --lib-dir describing where you want tower to place
