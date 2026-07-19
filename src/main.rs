@@ -246,8 +246,6 @@ fn main() -> Result<(), InputError> {
         },
         Commands::Install { packages, lib_dir,
             root_dir, force, yes, run_scripts } => {
-            let atoms = get_atoms(&lib_dir);
-
             confirm_pkgs_action(
                 yes,
                 "Are you sure you want to install the following package(s)",
@@ -330,7 +328,7 @@ fn main() -> Result<(), InputError> {
             }
             rebuild_lock(
                 &lib_dir,
-                &atoms
+                &get_atoms(&lib_dir)
             );
         },
         Commands::Purge { packages, lib_dir, root_dir, yes, run_scripts } => {
