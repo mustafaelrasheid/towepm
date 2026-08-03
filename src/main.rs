@@ -560,12 +560,22 @@ fn main() -> Result<(), InputError> {
 
             put_group(&lib_dir, &group);
         },
-        Commands::ListGroup { group, lib_dir } => {
-            let group = get_group(&lib_dir, &group);
-            
-            for item in group.atoms {
-                println!("{}", item);
-            }
+        Commands::ListGroup { groups, lib_dir } => {
+        	for group in groups {
+	            let group = get_group(&lib_dir, &group);
+
+	            println!("Name: {}", group.name);
+	            if let Some(val) = group.description {
+	            	println!("Description: {}", val);
+	            }
+	            if group.atoms.is_empty() {
+	            	println!("This group doesn't have any packages");
+	            } else {
+		            for item in group.atoms {
+		                println!("\t{}", item);
+		            }
+		        }
+	        }
         },
         Commands::DeleteGroup { group, lib_dir } => {
             remove_file(

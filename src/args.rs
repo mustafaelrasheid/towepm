@@ -87,7 +87,7 @@ pub enum Commands {
         lib_dir: String,
     },
     ListGroup {
-        group: String,
+        groups: Vec<String>,
         #[arg(long, default_value = "/var/lib/tower")]
         lib_dir: String,
     },
