@@ -1,610 +1,609 @@
 use std::string::FromUtf8Error;
 use std::collections::{HashMap, HashSet};
 use crate::utils::{
-    uncover_archive,
-    parse_control,
-    find_entry_as_regular
+	uncover_archive,
+	parse_control,
+	find_entry_as_regular
 };
 use crate::error::{ArchiveError, InvalidInput};
 use crate::atom::{
-    Atom,
-    AtomMetadata,
-    Entry,
-    EntryType,
-    Trigger,
-    Shlib,
-    SymbolHeader,
-    Symbol,
-    SymbolTable,
-    Scripts
+	Atom,
+	AtomMetadata,
+	Entry,
+	EntryType,
+	Trigger,
+	Shlib,
+	SymbolHeader,
+	Symbol,
+	SymbolTable,
+	Scripts
 };
 use crate::lock::{Lock, Modification, FileEntry, DirectoryEntry};
 
 fn map_control_to_atom(
-    control: &Vec<(String, String)>,
-    scripts: Option<Scripts>,
-    conffiles: &Vec<String>,
-    copyright: Option<String>,
-    changelog: Option<String>,
-    md5sums: HashMap<String, String>,
-    entries: &Vec<Entry>,
-    triggers: Option<Vec<Trigger>>,
-    shlibs: Option<Vec<Shlib>>,
-    symbols: Option<Vec<SymbolTable>>
+	control: &Vec<(String, String)>,
+	scripts: Option<Scripts>,
+	conffiles: &Vec<String>,
+	copyright: Option<String>,
+	changelog: Option<String>,
+	md5sums: HashMap<String, String>,
+	entries: &Vec<Entry>,
+	triggers: Option<Vec<Trigger>>,
+	shlibs: Option<Vec<Shlib>>,
+	symbols: Option<Vec<SymbolTable>>
 ) -> AtomMetadata {
-    let mut metadata = AtomMetadata::new(
-        "", None, None, None, None, None, None, None, None,
-        copyright, changelog, 
-        None, scripts, triggers, shlibs, symbols
-    );
-    
-    for (field, value) in control {
-        match field.as_str() {
-            "Package" => {
-                metadata.name = value
-                    .as_str()
-                    .to_string();
-            },
-            "Description" => {
-                metadata.description = Some(
-                    value
-                        .as_str()
-                        .to_string()
-                );
-            },
-            "Version" => {
-                metadata.version = Some(
-                    value
-                        .as_str()
-                        .to_string()
-                );
-            },
-            "Architecture" => {
-                metadata.architecture = Some(
-                    value
-                        .as_str()
-                        .to_string()
-                );
-            },
-            "Maintainer" => {
-                metadata.maintainer = Some(
-                    value
-                        .as_str()
-                        .to_string()
-                );
-            },
-            "Section" => {
-                metadata.section = Some(
-                    value
-                        .as_str()
-                        .to_string()
-                );
-            },
-            "Priority" => {
-                metadata.priority = Some(
-                    value
-                        .as_str()
-                        .to_string()
-                );
-            },
-            "Homepage" => {
-                metadata.homepage = Some(
-                    value
-                        .as_str()
-                        .to_string()
-                );
-            },
-            "Depends" => {
-                metadata.depends = Some(
-                    value
-                        .split(',')
-                        .map(|dep| { dep
-                            .trim()
-                            .split_whitespace()
-                            .next()
-                            .unwrap_or("")
-                            .to_string()
-                        })
-                        .filter(|dep| !dep.is_empty())
-                        .collect()
-                );
-            },
-            _ => {}
-        }
-    }
-    
-    for entry in entries {
-        let modification = if conffiles.contains(&entry.path) {
-            Modification::Exist
-        } else {
-            Modification::Replace
-        };
-        
-        if let Some(md5sum) = md5sums.get(&entry.path)
-        && let EntryType::Regular(data) = &entry.data {
-            if &format!("{:x}", md5::compute(&data)) != md5sum {
-                println!(
-                    "Warning: Failed md5 checksum for file {}",
-                    entry.path
-                );
-            }
-        }
+	let mut metadata = AtomMetadata::new(
+		"", None, None, None, None, None, None, None, None,
+		copyright, changelog, 
+		None, scripts, triggers, shlibs, symbols
+	);
 
-        insert_path(
-            &mut metadata.contents,
-            &entry.path,
-            modification,
-            md5sums.get(&entry.path).cloned()
-        );
-    }
-    
-    return metadata;
+	for (field, value) in control {
+		match field.as_str() {
+			"Package" => {
+				metadata.name = value
+					.as_str()
+					.to_string();
+			},
+			"Description" => {
+				metadata.description = Some(
+					value
+						.as_str()
+						.to_string()
+				);
+			},
+			"Version" => {
+				metadata.version = Some(
+					value
+						.as_str()
+						.to_string()
+				);
+			},
+			"Architecture" => {
+				metadata.architecture = Some(
+					value
+						.as_str()
+						.to_string()
+				);
+			},
+			"Maintainer" => {
+				metadata.maintainer = Some(
+					value
+						.as_str()
+						.to_string()
+				);
+			},
+			"Section" => {
+				metadata.section = Some(
+					value
+						.as_str()
+						.to_string()
+				);
+			},
+			"Priority" => {
+				metadata.priority = Some(
+					value
+						.as_str()
+						.to_string()
+				);
+			},
+			"Homepage" => {
+				metadata.homepage = Some(
+					value
+						.as_str()
+						.to_string()
+				);
+			},
+			"Depends" => {
+				metadata.depends = Some(
+					value
+						.split(',')
+						.map(|dep| { dep
+							.trim()
+							.split_whitespace()
+							.next()
+							.unwrap_or("")
+							.to_string()
+						})
+						.filter(|dep| !dep.is_empty())
+						.collect()
+				);
+			},
+			_ => {}
+		}
+	}
+
+	for entry in entries {
+		let modification = if conffiles.contains(&entry.path) {
+			Modification::Exist
+		} else {
+			Modification::Replace
+		};
+
+		if let Some(md5sum) = md5sums.get(&entry.path)
+		&& let EntryType::Regular(data) = &entry.data {
+			if &format!("{:x}", md5::compute(&data)) != md5sum {
+				println!(
+					"Warning: Failed md5 checksum for file {}",
+					entry.path
+				);
+			}
+		}
+
+		insert_path(
+			&mut metadata.contents,
+			&entry.path,
+			modification,
+			md5sums.get(&entry.path).cloned()
+		);
+	}
+
+	return metadata;
 }
 
 fn insert_path(
-    contents: &mut HashMap<String, Lock>,
-    path: &str,
-    modification: Modification,
-    md5sum: Option<String>
+	contents: &mut HashMap<String, Lock>,
+	path: &str,
+	modification: Modification,
+	md5sum: Option<String>
 ) {
-    let parts: Vec<String> = path
-        .trim_start_matches("./")
-        .split('/')
-        .map(|s| s.to_string())
-        .collect();
-    
-    let part = &parts[0];
-    
-    if parts.len() == 1 {
-        contents.insert(
-            part.clone(),
-            Lock::File(
-                FileEntry::new(
-                    Some(modification),
-                    None,
-                    None,
-                    md5sum
-                )
-            )
-        );
-        return;
-    }
-    
-    if !contents.contains_key(part) {
-        contents.insert(
-            part.clone(),
-            Lock::Dir(DirectoryEntry::new())
-        );
-    }
-    
-    if let Lock::Dir(dir) = contents.get_mut(part).unwrap() {
-        insert_path(
-            &mut dir.contents,
-            &parts[1..].join("/"),
-            modification,
-            md5sum
-        );
-    }
+	let parts: Vec<String> = path
+		.trim_start_matches("./")
+		.split('/')
+		.map(|s| s.to_string())
+		.collect();
+
+	let part = &parts[0];
+
+	if parts.len() == 1 {
+		contents.insert(
+			part.clone(),
+			Lock::File(
+				FileEntry::new(
+					Some(modification),
+					None,
+					None,
+					md5sum
+				)
+			)
+		);
+		return;
+	}
+
+	if !contents.contains_key(part) {
+		contents.insert(
+			part.clone(),
+			Lock::Dir(DirectoryEntry::new())
+		);
+	}
+
+	if let Lock::Dir(dir) = contents.get_mut(part).unwrap() {
+		insert_path(
+			&mut dir.contents,
+			&parts[1..].join("/"),
+			modification,
+			md5sum
+		);
+	}
 }
 
 fn dpkg_version(content: &[u8]) -> Result<String, FromUtf8Error> {
-    let content = String::from_utf8(content.to_vec())?
-        .trim()
-        .to_string();
+	let content = String::from_utf8(content.to_vec())?
+		.trim()
+		.to_string();
 
-    return Ok(content);
+	return Ok(content);
 }
 
 fn parse_conffiles(text: &str) -> Vec<String> {
-    let lines = text
-        .lines()
-        .map(|line| line
-            .trim()
-            .trim_start_matches("/")
-            .to_string()
-        )
-        .filter(|line| !line.is_empty())
-        .collect();
+	let lines = text
+		.lines()
+		.map(|line| line
+			.trim()
+			.trim_start_matches("/")
+			.to_string()
+		)
+		.filter(|line| !line.is_empty())
+		.collect();
 
-    return lines;
+	return lines;
 }
 
 fn parse_md5sums(text: &str) -> HashMap<String, String> {
-    let pairs: HashMap<String, String> = text.lines()
-        .map(|line| line
-            .split("  ")
-            .map(|s| s.to_string())
-            .collect::<Vec<String>>()
-        )
-        .map(|line| (
-            line[1]
-                .trim()
-                .trim_start_matches("/")
-                .to_string(),
-            line[0]
-                .clone()
-        ))
-        .filter(|line| !line.0.is_empty() || !line.1.is_empty())
-        .collect();
+	let pairs: HashMap<String, String> = text.lines()
+		.map(|line| line
+			.split("  ")
+			.map(|s| s.to_string())
+			.collect::<Vec<String>>()
+		)
+		.map(|line| (
+			line[1]
+				.trim()
+				.trim_start_matches("/")
+				.to_string(),
+			line[0]
+				.clone()
+		))
+		.filter(|line| !line.0.is_empty() || !line.1.is_empty())
+		.collect();
 
-    return pairs;
+	return pairs;
 }
 
 fn parse_triggers(text: &str) -> Result<Vec<Trigger>, InvalidInput> {
-    let mut triggers = Vec::new();
+	let mut triggers = Vec::new();
 
-    for line in text.split("\n") {
-        let line = line.trim();
-        let parts: Vec<&str> = line
-            .split(' ')
-            .collect();
-        
-        if line.is_empty() || line.starts_with("#") {
-            continue;
-        }
-        if parts.len() < 2 {
-            return Err(
-                InvalidInput::MissingData(
-                    "incomplete triggers file format".to_string()
-                )
-            );
-        }
+	for line in text.split("\n") {
+		let line = line.trim();
+		let parts: Vec<&str> = line
+			.split(' ')
+			.collect();
 
-        triggers.push(
-            Trigger::new(
-                parts[1],
-                parts[0].try_into()?
-            )
-        );
-    }
-    
-    return Ok(triggers);
+		if line.is_empty() || line.starts_with("#") {
+			continue;
+		}
+		if parts.len() < 2 {
+			return Err(
+				InvalidInput::MissingData(
+					"incomplete triggers file format".to_string()
+				)
+			);
+		}
+
+		triggers.push(
+			Trigger::new(
+				parts[1],
+				parts[0].try_into()?
+			)
+		);
+	}
+
+	return Ok(triggers);
 }
 
 fn parse_shlibs(text: &str) -> Result<Vec<Shlib>, InvalidInput> {
-    let shlibs = text
-        .lines()
-        .filter(|line|
-            !line.is_empty()
-            && !line.starts_with("#")
-            && !line.starts_with("udeb: ")
-        )
-        .map(|line| line
-            .trim_end_matches(")")
-            .split_whitespace()
-            .map(|s| s.to_string())
-            .collect::<Vec<String>>()
-        )
-        .map(|parts| {
-            if parts.len() < 3 {
-                return Err(
-                    InvalidInput::MissingData(
-                        "incomplete shlib file format".to_string()
-                    )
-                );
-            }
+	let shlibs = text
+		.lines()
+		.filter(|line|
+			!line.is_empty()
+			&& !line.starts_with("#")
+			&& !line.starts_with("udeb: ")
+		)
+		.map(|line| line
+			.trim_end_matches(")")
+			.split_whitespace()
+			.map(|s| s.to_string())
+			.collect::<Vec<String>>()
+		)
+		.map(|parts| {
+			if parts.len() < 3 {
+				return Err(
+					InvalidInput::MissingData(
+						"incomplete shlib file format".to_string()
+					)
+				);
+			}
 
-            return Ok(
-                Shlib::new(
-                    &parts[0],
-                    &parts[1],
-                    &parts[2],
-                    parts.get(4).map(|v| v.to_string())
-                )
-            );
-        })
-        .collect::<Result<Vec<Shlib>, InvalidInput>>()?;
-    
-    return Ok(shlibs);
+			return Ok(
+				Shlib::new(
+					&parts[0],
+					&parts[1],
+					&parts[2],
+					parts.get(4).map(|v| v.to_string())
+				)
+			);
+		})
+		.collect::<Result<Vec<Shlib>, InvalidInput>>()?;
+
+	return Ok(shlibs);
 }
 
 fn parse_symbols(text: &str) -> Result<Vec<SymbolTable>, InvalidInput> {
-    let mut symbol_tables: Vec<SymbolTable> = Vec::new();
+	let mut symbol_tables: Vec<SymbolTable> = Vec::new();
+
+	for line in text.lines() {
+		if line.starts_with(' ') {
+			let parts: Vec<&str> = line
+				.trim_start_matches(" ")
+				.split_whitespace()
+				.collect();
             
-    for line in text.lines() {
-        if line.starts_with(' ') {
-            let parts: Vec<&str> = line
-                .trim_start_matches(" ")
-                .split_whitespace()
-                .collect();
-            
-            if parts.len() < 2 {
-                return Err(
-                    InvalidInput::MissingData(
-                        "invalid symbols format".to_string()
-                    )
-                );
-            }
-            symbol_tables.last_mut().ok_or(
-                InvalidInput::MissingData(
-                    "invalid symbols format".to_string()
-                )
-            )?.symbols.push(
-                Symbol::new(
-                    parts[0],
-                    parts[1],
-                    parts
-                        .get(2)
-                        .map(|a| a.parse())
-                        .transpose()?
-                )
-            );
-        } else if line.starts_with('|') {
-            let parts: Vec<&str> = line.split("|").collect();
-            let table = symbol_tables.last_mut().ok_or(
-                InvalidInput::MissingData(
-                    "invalid symbols format".to_string()
-                )
-            )?;
+			if parts.len() < 2 {
+				return Err(
+					InvalidInput::MissingData(
+						"invalid symbols format".to_string()
+					)
+				);
+			}
+			symbol_tables.last_mut().ok_or(
+					InvalidInput::MissingData(
+						"invalid symbols format".to_string()
+					)
+				)?.symbols.push(
+					Symbol::new(
+						parts[0],
+						parts[1],
+						parts
+							.get(2)
+							.map(|a| a.parse())
+							.transpose()?
+				)
+			);
+		} else if line.starts_with('|') {
+			let parts: Vec<&str> = line.split("|").collect();
+			let table = symbol_tables.last_mut().ok_or(
+				InvalidInput::MissingData(
+					"invalid symbols format".to_string()
+				)
+			)?;
 
-            for part in parts {
-                if part.is_empty() {
-                    continue;
-                }
-                if let Some(alternatives) = &mut table.header.alternatives {
-                    alternatives.push(part.to_string());
-                } else {
-                    table.header.alternatives = Some(
-                        vec![part.to_string()]
-                    );
-                }
-            }
-        } else {
-            let parts: Vec<&str> = line.split("|").collect();
-            let alternatives: Option<Vec<String>> = match parts.len() {
-                1 => {
-                    None
-                },
-                _ => {
-                    Some(
-                        parts[1..]
-                            .to_vec()
-                            .into_iter()
-                            .map(|s| s.to_string())
-                            .collect()
-                    )
-                }
-            };
-            let fragements: Vec<&str> = parts[0]
-                .trim()
-                .split(" ")
-                .collect();
+			for part in parts {
+				if part.is_empty() {
+					continue;
+				}
+				if let Some(alternatives) = &mut table.header.alternatives {
+					alternatives.push(part.to_string());
+				} else {
+					table.header.alternatives = Some(
+						vec![part.to_string()]
+					);
+				}
+			}
+		} else {
+			let parts: Vec<&str> = line.split("|").collect();
+			let alternatives: Option<Vec<String>> = match parts.len() {
+				1 => {
+					None
+				},
+				_ => {
+					Some(
+						parts[1..]
+							.to_vec()
+							.into_iter()
+							.map(|s| s.to_string())
+							.collect()
+					)
+				}
+			};
+			let fragements: Vec<&str> = parts[0]
+				.trim()
+				.split(" ")
+				.collect();
 
-            if fragements.len() < 2 {
-                return Err(
-                    InvalidInput::MissingData(
-                        "invalid symbols format".to_string()
-                    )
-                )
-            }
+			if fragements.len() < 2 {
+				return Err(
+					InvalidInput::MissingData(
+						"invalid symbols format".to_string()
+					)
+				)
+			}
 
-            symbol_tables.push(
-                SymbolTable::new(
-                    SymbolHeader::new(
-                        fragements[0],
-                        fragements[1],
-                        fragements
-                            .get(1)
-                            .map(|v| v.to_string()),
-                        alternatives
-                    )
-                )
-            );
-        }
-    }
-    
-    return Ok(symbol_tables);
+			symbol_tables.push(
+				SymbolTable::new(
+					SymbolHeader::new(
+						fragements[0],
+						fragements[1],
+						fragements
+							.get(1)
+							.map(|v| v.to_string()),
+						alternatives
+					)
+				)
+			);
+		}
+	}
+
+	return Ok(symbol_tables);
 }
 
 fn dpkg_control(content: &[u8])
 -> Result<(
-    Vec<(String, String)>,
-    Option<Scripts>,
-    Vec<String>,
-    Option<String>,
-    Option<String>,
-    HashMap<String, String>,
-    Option<Vec<Trigger>>,
-    Option<Vec<Shlib>>,
-    Option<Vec<SymbolTable>>
+	Vec<(String, String)>,
+	Option<Scripts>,
+	Vec<String>,
+	Option<String>,
+	Option<String>,
+	HashMap<String, String>,
+	Option<Vec<Trigger>>,
+	Option<Vec<Shlib>>,
+	Option<Vec<SymbolTable>>
 ), InvalidInput> {
-    let archive = uncover_archive(content)?;
-    let control = find_entry_as_regular(&archive, &["control"])?;
-    let preinst = find_entry_as_regular(&archive, &["preinst"])
-        .ok()
-        .map(|text| String::from_utf8(text.to_vec()))
-        .transpose()?;
-    let postinst = find_entry_as_regular(&archive, &["postinst"])
-        .ok()
-        .map(|text| String::from_utf8(text.to_vec()))
-        .transpose()?;
-    let prerm = find_entry_as_regular(&archive, &["prerm"])
-        .ok()
-        .map(|text| String::from_utf8(text.to_vec()))
-        .transpose()?;
-    let postrm = find_entry_as_regular(&archive, &["postrm"])
-        .ok()
-        .map(|text| String::from_utf8(text.to_vec()))
-        .transpose()?;
-    let conffiles = find_entry_as_regular(&archive, &["conffiles"])
-        .ok()
-        .map(|text| String::from_utf8(text.to_vec()))
-        .transpose()?
-        .map(|text| parse_conffiles(&text))
-        .unwrap_or(Vec::new());
-    let md5sums = find_entry_as_regular(&archive, &["md5sums"])
-        .ok()
-        .map(|text| String::from_utf8(text.to_vec()))
-        .transpose()?
-        .map(|text| parse_md5sums(&text))
-        .unwrap_or(HashMap::new());
-    let copyright = find_entry_as_regular(&archive, &["copyright"])
-        .ok()
-        .map(|text| String::from_utf8(text.to_vec()))
-        .transpose()?;
-    let changelog = find_entry_as_regular(&archive, &["changelog"])
-        .ok()
-        .map(|text| String::from_utf8(text.to_vec()))
-        .transpose()?;
-    let triggers = find_entry_as_regular(&archive, &["triggers"])
-        .ok()
-        .map(|text| String::from_utf8(text.to_vec()))
-        .transpose()?
-        .map(|text| parse_triggers(&text))
-        .transpose()?;
-    let shlibs = find_entry_as_regular(&archive, &["shlibs"])
-        .ok()
-        .map(|text| String::from_utf8(text.to_vec()))
-        .transpose()?
-        .map(|text| parse_shlibs(&text))
-        .transpose()?;
-    let symbols = find_entry_as_regular(&archive, &["symbols"])
-        .ok()
-        .map(|text| String::from_utf8(text.to_vec()))
-        .transpose()?
-        .map(|text| parse_symbols(&text))
-        .transpose()?;
-    
-    return Ok((
-        parse_control(&String::from_utf8(control.to_vec())?),
-        Some(Scripts::new(preinst, postinst, prerm, postrm)),
-        conffiles,
-        copyright,
-        changelog,
-        md5sums,
-        triggers,
-        shlibs,
-        symbols
-    ));
+	let archive = uncover_archive(content)?;
+	let control = find_entry_as_regular(&archive, &["control"])?;
+	let preinst = find_entry_as_regular(&archive, &["preinst"])
+		.ok()
+		.map(|text| String::from_utf8(text.to_vec()))
+		.transpose()?;
+	let postinst = find_entry_as_regular(&archive, &["postinst"])
+		.ok()
+		.map(|text| String::from_utf8(text.to_vec()))
+		.transpose()?;
+	let prerm = find_entry_as_regular(&archive, &["prerm"])
+		.ok()
+		.map(|text| String::from_utf8(text.to_vec()))
+		.transpose()?;
+	let postrm = find_entry_as_regular(&archive, &["postrm"])
+		.ok()
+		.map(|text| String::from_utf8(text.to_vec()))
+		.transpose()?;
+	let conffiles = find_entry_as_regular(&archive, &["conffiles"])
+		.ok()
+		.map(|text| String::from_utf8(text.to_vec()))
+		.transpose()?
+		.map(|text| parse_conffiles(&text))
+		.unwrap_or(Vec::new());
+	let md5sums = find_entry_as_regular(&archive, &["md5sums"])
+		.ok()
+		.map(|text| String::from_utf8(text.to_vec()))
+		.transpose()?
+		.map(|text| parse_md5sums(&text))
+		.unwrap_or(HashMap::new());
+	let copyright = find_entry_as_regular(&archive, &["copyright"])
+		.ok()
+		.map(|text| String::from_utf8(text.to_vec()))
+		.transpose()?;
+	let changelog = find_entry_as_regular(&archive, &["changelog"])
+		.ok()
+		.map(|text| String::from_utf8(text.to_vec()))
+		.transpose()?;
+	let triggers = find_entry_as_regular(&archive, &["triggers"])
+		.ok()
+		.map(|text| String::from_utf8(text.to_vec()))
+		.transpose()?
+		.map(|text| parse_triggers(&text))
+		.transpose()?;
+	let shlibs = find_entry_as_regular(&archive, &["shlibs"])
+		.ok()
+		.map(|text| String::from_utf8(text.to_vec()))
+		.transpose()?
+		.map(|text| parse_shlibs(&text))
+		.transpose()?;
+	let symbols = find_entry_as_regular(&archive, &["symbols"])
+		.ok()
+		.map(|text| String::from_utf8(text.to_vec()))
+		.transpose()?
+		.map(|text| parse_symbols(&text))
+		.transpose()?;
+
+	return Ok((
+		parse_control(&String::from_utf8(control.to_vec())?),
+		Some(Scripts::new(preinst, postinst, prerm, postrm)),
+		conffiles,
+		copyright,
+		changelog,
+		md5sums,
+		triggers,
+		shlibs,
+		symbols
+	));
 }
 
 fn dpkg_data(content: &[u8])
 -> Result<Vec<Entry>, ArchiveError> {
-    return uncover_archive(&content);
+	return uncover_archive(&content);
 }
 
 pub fn extract_deb(package: &[u8])
 -> Result<Atom, InvalidInput> {
-    let entries = uncover_archive(package)?;
-    let version = dpkg_version(
-        find_entry_as_regular(
-            &entries,
-            &["debian-binary"]
-        )?
-    )?;
-    if &version != "2.0" {
-        return Err(
-            InvalidInput::FormatSupport(
-                "Unknown debian package version"
-            .to_string())
-        );
-    }
-    let (control, scripts, conffiles, copyright,
-        changelog, md5sums, triggers, shlibs, symbols) = dpkg_control(
-        find_entry_as_regular(
-            &entries,
-            &["control.tar.gz", "control.tar.xz"]
-        )?
-    )?;
-    let data = dpkg_data(
-        find_entry_as_regular(
-            &entries,
-            &["data.tar.gz", "data.tar.xz"]
-        )?
-    )?;
-    
-    return Ok(
-        Atom::new(
-            map_control_to_atom(
-                &control,
-                scripts,
-                &conffiles,
-                copyright,
-                changelog,
-                md5sums,
-                &data,
-                triggers,
-                shlibs,
-                symbols
-            ),
-            data
-        )
-    );
+	let entries = uncover_archive(package)?;
+	let version = dpkg_version(
+		find_entry_as_regular(
+			&entries,
+			&["debian-binary"]
+		)?
+	)?;
+	if &version != "2.0" {
+		return Err(
+			InvalidInput::FormatSupport(
+				"Unknown debian package version"
+			.to_string())
+		);
+	}
+	let (control, scripts, conffiles, copyright,
+		changelog, md5sums, triggers, shlibs, symbols) = dpkg_control(
+			find_entry_as_regular(
+				&entries,
+				&["control.tar.gz", "control.tar.xz"]
+			)?
+		)?;
+	let data = dpkg_data(
+		find_entry_as_regular(
+			&entries,
+			&["data.tar.gz", "data.tar.xz"]
+		)?
+	)?;
+
+	return Ok(
+		Atom::new(
+			map_control_to_atom(
+				&control,
+				scripts,
+				&conffiles,
+				copyright,
+				changelog,
+				md5sums,
+				&data,
+				triggers,
+				shlibs,
+				symbols
+			),
+			data
+		)
+	);
 }
 
 fn resolve_recursive(
-    package: &AtomMetadata,
-    available: &HashMap<String, AtomMetadata>,
+	package: &AtomMetadata,
+	available: &HashMap<String, AtomMetadata>,
 ) -> Result<(HashSet<String>, HashSet<String>), InvalidInput> {
-    let mut missing = HashSet::new();
-    let mut processed = HashSet::new();
-    let mut to_process = vec![package.clone()];
-    
-    while let Some(current) = to_process.pop() {
-        if processed.contains(&current.name) {
-            continue;
-        }
-        
-        processed.insert(current.name.clone());
+	let mut missing = HashSet::new();
+	let mut processed = HashSet::new();
+	let mut to_process = vec![package.clone()];
 
-        for dep in current.depends.unwrap_or_default() {
-            if let Some(dep_meta) = available.get(&dep) {
-                if !processed.contains(&dep) {
-                    to_process.push(dep_meta.clone());
-                }
-            } else {
-                missing.insert(dep);
-            }
-        }
-    }
-    
-    return Ok((processed, missing));
+	while let Some(current) = to_process.pop() {
+		if processed.contains(&current.name) {
+			continue;
+		}
+
+		processed.insert(current.name.clone());
+
+		for dep in current.depends.unwrap_or_default() {
+			if let Some(dep_meta) = available.get(&dep) {
+				if !processed.contains(&dep) {
+					to_process.push(dep_meta.clone());
+				}
+			} else {
+				missing.insert(dep);
+			}
+		}
+	}
+
+	return Ok((processed, missing));
 }
 
 pub fn resolve_deps(
-    package: &mut Atom,
-    deps: &[Atom]
+	package: &mut Atom,
+	deps: &[Atom]
 ) -> Result<HashSet<String>, InvalidInput> {
-    let deps_metadata: HashMap<String, AtomMetadata> = deps
-        .iter()
-        .map(|atom| (
-            atom.metadata.name.to_string(),
-            atom.metadata.clone()
-        ))
-        .collect();
-    let (processed, missing) = resolve_recursive(
-        &package.metadata,
-        &deps_metadata,
-    )?;
+	let deps_metadata: HashMap<String, AtomMetadata> = deps
+		.iter()
+		.map(|atom| (
+			atom.metadata.name.to_string(),
+			atom.metadata.clone()
+		))
+		.collect();
+	let (processed, missing) = resolve_recursive(
+		&package.metadata,
+		&deps_metadata,
+	)?;
 
-    for processed_pkg_name in processed {
-        let added_dep = deps.iter()
-            .find(|dep_atom| &processed_pkg_name == &dep_atom.metadata.name);
-        let added_dep = if let Some(val) = added_dep {
-            val
-        } else {
-            continue;
-        };
-        
-        package.entries.append(&mut added_dep.entries.clone());
-        added_dep.entries
-            .iter()
-            .for_each(|entry| insert_path(
-                &mut package.metadata.contents,
-                &entry.path,
-                Modification::Exist,
-                None
-            ));
-    }
-    
-    return Ok(missing);
+	for processed_pkg_name in processed {
+		let added_dep = deps.iter()
+			.find(|dep_atom| &processed_pkg_name == &dep_atom.metadata.name);
+		let added_dep = if let Some(val) = added_dep {
+			val
+		} else {
+			continue;
+		};
+
+		package.entries.append(&mut added_dep.entries.clone());
+		added_dep.entries
+			.iter()
+			.for_each(|entry| insert_path(
+				&mut package.metadata.contents,
+				&entry.path,
+				Modification::Exist,
+				None
+			));
+	}
+
+	return Ok(missing);
 }
 
 pub fn convert_deb(package: &[u8], deps: &[Atom])
 -> Result<(Atom, HashSet<String>), InvalidInput> {
-    let mut package = extract_deb(package)?;
-    let missing = resolve_deps(&mut package, &deps)?;
-    
-    return Ok((package, missing));
-}
+	let mut package = extract_deb(package)?;
+	let missing = resolve_deps(&mut package, &deps)?;
 
+	return Ok((package, missing));
+}

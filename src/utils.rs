@@ -1,18 +1,18 @@
 use std::os::unix::fs::{PermissionsExt, symlink};
 use std::fs::{
-    read_to_string,
-    read_dir,
-    create_dir_all,
-    remove_file,
-    remove_dir,
-    Permissions,
-    set_permissions,
-    write
+	read_to_string,
+	read_dir,
+	create_dir_all,
+	remove_file,
+	remove_dir,
+	Permissions,
+	set_permissions,
+	write
 };
 use std::io::{
-    Error as IOError,
-    Read,
-    ErrorKind
+	Error as IOError,
+	Read,
+	ErrorKind
 };
 use std::io::ErrorKind::DirectoryNotEmpty;
 use std::path::Path;
@@ -21,493 +21,493 @@ use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;
 use tar::{
-    Archive as TarArchive,
-    Builder as TarBuilder,
-    Header as TarHeader
+	Archive as TarArchive,
+	Builder as TarBuilder,
+	Header as TarHeader
 };
 use ar::Archive as ArArchive;
 use serde_json::{Value};
 use crate::error::{
-    ArchiveError,
-    InputError,
-    MissingInput,
-    InvalidInput
+	ArchiveError,
+	InputError,
+	MissingInput,
+	InvalidInput
 };
 use crate::atom::{Atom, Entry, EntryType};
 use crate::lock::{Lock, DirectoryEntry};
 
 pub fn read_file_as_json(path: &str)
 -> Result<Value, InputError> {
-    let file = read_to_string(&path)
-        .map_err(MissingInput::from)?;
-    let json: Value = serde_json::from_str(&file)
-        .map_err(InvalidInput::from)?;
+	let file = read_to_string(&path)
+		.map_err(MissingInput::from)?;
+	let json: Value = serde_json::from_str(&file)
+		.map_err(InvalidInput::from)?;
 
-    return Ok(json); 
+	return Ok(json); 
 }
 
 pub fn read_collection_as_json(path: &str)
 -> Result<Vec<Value>, InputError> {
-    let mut collection = Vec::new();
-    
-    for entry in read_dir(&path).map_err(MissingInput::from)? {
-        let entry = entry.map_err(MissingInput::from)?;
-        let path = entry.path();
-        
-        if path.extension().and_then(|s| s.to_str()) == Some("json") {
-            let content = read_to_string(&path)
-                .map_err(MissingInput::from)?;
-            let item: Value = serde_json::from_str(&content)
-                .map_err(InvalidInput::from)?;
-            
-            collection.push(item);
-        }
-    }
-    
-    return Ok(collection);
+	let mut collection = Vec::new();
+
+	for entry in read_dir(&path).map_err(MissingInput::from)? {
+		let entry = entry.map_err(MissingInput::from)?;
+		let path = entry.path();
+
+		if path.extension().and_then(|s| s.to_str()) == Some("json") {
+			let content = read_to_string(&path)
+				.map_err(MissingInput::from)?;
+			let item: Value = serde_json::from_str(&content)
+				.map_err(InvalidInput::from)?;
+
+			collection.push(item);
+		}
+	}
+
+	return Ok(collection);
 }
 
 pub fn map_atom_to_entries(
-    lock: &Lock,
-    path: &str,
-    list_dirs: bool,
-    ignores: &[&str]
+	lock: &Lock,
+	path: &str,
+	list_dirs: bool,
+	ignores: &[&str]
 ) -> Vec<String> {
-    let mut entries: Vec<String> = Vec::new();
-    
-    match lock {
-        Lock::File(file) => {
-            let is_ignore = if let Some(modif) = &file.modification {
-                ignores.contains(&modif.as_ref())
-            } else { false };
-            
-            if !is_ignore {
-                entries.push(path.to_string());
-            }
-        },
-        Lock::Dir(dir) => {
-            if list_dirs {
-                entries.push(path.to_string());
-            }
-            for (name, value) in &dir.contents {
-                let filesystem_path = format!("{}/{}", path, name);
-                let mut nested = map_atom_to_entries(
-                    value,
-                    &filesystem_path,
-                    list_dirs,
-                    ignores
-                );
+	let mut entries: Vec<String> = Vec::new();
 
-                entries.append(&mut nested);
-            }
-        }
-    }
+	match lock {
+		Lock::File(file) => {
+			let is_ignore = if let Some(modif) = &file.modification {
+				ignores.contains(&modif.as_ref())
+			} else { false };
 
-    return entries;
+			if !is_ignore {
+				entries.push(path.to_string());
+			}
+		},
+		Lock::Dir(dir) => {
+			if list_dirs {
+				entries.push(path.to_string());
+			}
+			for (name, value) in &dir.contents {
+				let filesystem_path = format!("{}/{}", path, name);
+				let mut nested = map_atom_to_entries(
+					value,
+					&filesystem_path,
+					list_dirs,
+					ignores
+				);
+
+				entries.append(&mut nested);
+			}
+		}
+	}
+
+	return entries;
 }
 
 pub fn map_entries_to_atom(
-    path: &str,
-    lock: &Lock,
-    ignore: &Lock,
-    recusrive: bool
+	path: &str,
+	lock: &Lock,
+	ignore: &Lock,
+	recusrive: bool
 ) -> Result<Vec<String>, IOError> {
-    let mut output: Vec<String> = Vec::new();
-    let lock = if let Lock::Dir(dir) = lock {
-        dir
-    } else { return Ok(output); };
-    let ignore = if let Lock::Dir(dir) = ignore {
-        dir
-    } else { return Ok(output); };
-    let read_dir_path = if path == "" { "/" } else { path };
-    let entries = read_dir(read_dir_path)?;
-            
-    for entry in entries {
-        let entry = entry?;
-        let name = entry.file_name();
-        let name_str = name.to_string_lossy().to_string();
-        let full_path = format!("{}/{}", path, name_str);
-        let is_found = lock.contents.contains_key(&name_str);
-        let ignoreable = ignore.contents.contains_key(&name_str);
-        
-        if ignoreable {
-            continue;
-        }
-        
-        if !is_found {
-            output.push(full_path.clone());
-        }
+	let mut output: Vec<String> = Vec::new();
+	let lock = if let Lock::Dir(dir) = lock {
+		dir
+	} else { return Ok(output); };
+	let ignore = if let Lock::Dir(dir) = ignore {
+		dir
+	} else { return Ok(output); };
+	let read_dir_path = if path == "" { "/" } else { path };
+	let entries = read_dir(read_dir_path)?;
 
-        if !entry.file_type()?.is_dir() || (!recusrive && !is_found) {
-            continue;
-        }
-        if !recusrive{
-            if !is_found {
-                continue;
-            }
-        }
+	for entry in entries {
+		let entry = entry?;
+		let name = entry.file_name();
+		let name_str = name.to_string_lossy().to_string();
+		let full_path = format!("{}/{}", path, name_str);
+		let is_found = lock.contents.contains_key(&name_str);
+		let ignoreable = ignore.contents.contains_key(&name_str);
 
-        let empty_lock = Lock::Dir(DirectoryEntry::new());
-        let mut nested = map_entries_to_atom(
-            &full_path,
-            &lock.contents.get(&name_str)
-                .unwrap_or(&empty_lock),
-            &empty_lock,
-            recusrive
-        )?;
+		if ignoreable {
+			continue;
+		}
 
-        output.append(&mut nested);
-    }
+		if !is_found {
+			output.push(full_path.clone());
+		}
 
-    return Ok(output);
+		if !entry.file_type()?.is_dir() || (!recusrive && !is_found) {
+			continue;
+		}
+		if !recusrive{
+			if !is_found {
+				continue;
+			}
+		}
+
+		let empty_lock = Lock::Dir(DirectoryEntry::new());
+		let mut nested = map_entries_to_atom(
+			&full_path,
+			&lock.contents.get(&name_str)
+				.unwrap_or(&empty_lock),
+			&empty_lock,
+			recusrive
+		)?;
+
+		output.append(&mut nested);
+	}
+
+	return Ok(output);
 }
 
 pub fn decompress_package(data: &[u8])
 -> Result<Vec<u8>, ArchiveError> {
-    if data.starts_with(b"\x1f\x8b") {
-        let mut decoder = GzDecoder::new(data);
-        let mut decompressed = Vec::new();
+	if data.starts_with(b"\x1f\x8b") {
+		let mut decoder = GzDecoder::new(data);
+		let mut decompressed = Vec::new();
 
-        decoder.read_to_end(&mut decompressed)
-            .map_err(|e| ArchiveError::Compression(e))?;
-        
-        return Ok(decompressed);
-    }
-    if data.starts_with(b"\xfd7zXZ\x00") {
-        let mut decoder = XzDecoder::new(data);
-        let mut decompressed = Vec::new();
+		decoder.read_to_end(&mut decompressed)
+			.map_err(|e| ArchiveError::Compression(e))?;
 
-        decoder.read_to_end(&mut decompressed)
-            .map_err(|e| ArchiveError::Compression(e))?;
-        
-        return Ok(decompressed);
-    }
-    
-    return Ok(data.to_vec());
+		return Ok(decompressed);
+	}
+	if data.starts_with(b"\xfd7zXZ\x00") {
+		let mut decoder = XzDecoder::new(data);
+		let mut decompressed = Vec::new();
+
+		decoder.read_to_end(&mut decompressed)
+			.map_err(|e| ArchiveError::Compression(e))?;
+
+		return Ok(decompressed);
+	}
+
+	return Ok(data.to_vec());
 }
 
 fn extract_tar(data: &[u8])
 -> Result<Vec<Entry>, ArchiveError> {
-    let mut hardlinks: Vec<(String, u32, String)> = Vec::new();
-    let mut archive = TarArchive::new(data);
-    let mut entries: Vec<Entry> = Vec::new();
-    
-    for entry_result in archive.entries()
-        .map_err(|e| ArchiveError::Archive(e))? {
-        let mut entry = entry_result
-            .map_err(|e| ArchiveError::Archive(e))?;
-        let entry_type = entry.header().entry_type();
-        
-        if !(entry_type.is_file()
-        || entry_type.is_hard_link()
-        || entry_type.is_symlink()) {
-            continue;
-        }
-        
-        let mut buffer = Vec::new();
-        let path = entry.path()
-            .map_err(|e| ArchiveError::Archive(e))?
-            .to_string_lossy()
-            .trim_start_matches("./")
-            .to_string();
-        let permission = entry
-            .header()
-            .mode()
-            .map_err(|e| ArchiveError::Archive(e))?;
-        
-        if entry_type.is_hard_link() {
-            let target = entry.header()
-                .link_name()
-                .map_err(|e| ArchiveError::Archive(e))?
-                .map(|t| t
-                    .to_string_lossy()
-                    .trim_start_matches("./")
-                    .to_string()
-                )
-                .unwrap_or_default();
+	let mut hardlinks: Vec<(String, u32, String)> = Vec::new();
+	let mut archive = TarArchive::new(data);
+	let mut entries: Vec<Entry> = Vec::new();
 
-            hardlinks.push((
-                path,
-                permission,
-                target
-            ));
-            continue;
-        }
-        let data = if entry_type.is_file() {
-            entry.read_to_end(&mut buffer)
-                .map_err(|e| ArchiveError::Archive(e))?;
+	for entry_result in archive.entries()
+		.map_err(|e| ArchiveError::Archive(e))? {
+		let mut entry = entry_result
+			.map_err(|e| ArchiveError::Archive(e))?;
+		let entry_type = entry.header().entry_type();
 
-            EntryType::Regular(buffer)
-        } else {
-            EntryType::Symlink(
-                entry.header()
-                    .link_name()
-                    .map_err(|e| ArchiveError::Archive(e))?
-                    .map(|t| t
-                        .to_string_lossy()
-                        .trim_start_matches("./")
-                        .to_string()
-                    )
-                    .unwrap_or_default()
-            )
-        };
-        entries.push(
-            Entry::new(
-                &path,
-                permission,
-                data
-            )
-        );
+		if !(entry_type.is_file()
+		|| entry_type.is_hard_link()
+		|| entry_type.is_symlink()) {
+			continue;
+		}
+        
+		let mut buffer = Vec::new();
+		let path = entry.path()
+			.map_err(|e| ArchiveError::Archive(e))?
+			.to_string_lossy()
+			.trim_start_matches("./")
+			.to_string();
+		let permission = entry
+			.header()
+			.mode()
+			.map_err(|e| ArchiveError::Archive(e))?;
+
+		if entry_type.is_hard_link() {
+			let target = entry.header()
+				.link_name()
+				.map_err(|e| ArchiveError::Archive(e))?
+				.map(|t| t
+					.to_string_lossy()
+					.trim_start_matches("./")
+					.to_string()
+				)
+				.unwrap_or_default();
+
+			hardlinks.push((
+				path,
+				permission,
+				target
+			));
+			continue;
+		}
+		let data = if entry_type.is_file() {
+			entry.read_to_end(&mut buffer)
+				.map_err(|e| ArchiveError::Archive(e))?;
+
+			EntryType::Regular(buffer)
+		} else {
+			EntryType::Symlink(
+				entry.header()
+					.link_name()
+					.map_err(|e| ArchiveError::Archive(e))?
+					.map(|t| t
+						.to_string_lossy()
+						.trim_start_matches("./")
+						.to_string()
+					)
+					.unwrap_or_default()
+			)
+		};
+		entries.push(
+			Entry::new(
+				&path,
+				permission,
+				data
+			)
+		);
+	}
+	for (path, perm, target) in hardlinks {
+		entries.push(
+			Entry::new(
+			&path,
+			perm,
+			entries
+				.iter()
+				.find_map(|entry| {
+					if entry.path.as_str() == target.as_str() {
+						return Some(entry.data.clone());
+					}
+					return None;
+				})
+				.ok_or(
+					ArchiveError::Archive(
+						IOError::new(
+							ErrorKind::NotFound,
+							"hardlink to inode not found"
+						)
+					)
+				)?
+			)
+		);
     }
-    for (path, perm, target) in hardlinks {
-        entries.push(
-            Entry::new(
-                &path,
-                perm,
-                entries
-                    .iter()
-                    .find_map(|entry| {
-                        if entry.path.as_str() == target.as_str() {
-                            return Some(entry.data.clone());
-                        }
-                        return None;
-                    })
-                    .ok_or(
-                        ArchiveError::Archive(
-                            IOError::new(
-                                ErrorKind::NotFound,
-                                "hardlink to inode not found"
-                            )
-                        )
-                    )?
-            )
-        );
-    }
-    
-    return Ok(entries);
+
+	return Ok(entries);
 }
 
 fn extract_ar(data: &[u8])
 -> Result<Vec<Entry>, ArchiveError> {
-    let mut ar = ArArchive::new(data);
-    let mut files = Vec::new();
-    
-    while let Some(entry_result) = ar.next_entry() {
-        let mut buffer = Vec::new();
-        let mut entry = entry_result
-            .map_err(|e| ArchiveError::Archive(e))?;
-        let path = String::from_utf8_lossy(
-            entry
-                .header()
-                .identifier()
-        ).trim_start_matches("./").to_string();
-        let permission = entry
-            .header()
-            .mode();
-        
-        entry.read_to_end(&mut buffer)
-            .map_err(|e| ArchiveError::Archive(e))?;
-        files.push(
-            Entry::new(
-                &path,
-                permission,
-                EntryType::Regular(buffer)
-            )
-        );
-    }
-    
-    return Ok(files);
+	let mut ar = ArArchive::new(data);
+	let mut files = Vec::new();
+
+	while let Some(entry_result) = ar.next_entry() {
+		let mut buffer = Vec::new();
+		let mut entry = entry_result
+			.map_err(|e| ArchiveError::Archive(e))?;
+		let path = String::from_utf8_lossy(
+			entry
+				.header()
+				.identifier()
+		).trim_start_matches("./").to_string();
+		let permission = entry
+			.header()
+			.mode();
+
+		entry.read_to_end(&mut buffer)
+			.map_err(|e| ArchiveError::Archive(e))?;
+		files.push(
+			Entry::new(
+				&path,
+				permission,
+				EntryType::Regular(buffer)
+			)
+		);
+	}
+
+	return Ok(files);
 }
 
 pub fn uncover_archive(archive: &[u8])
 -> Result<Vec<Entry>, ArchiveError> {
-    let archive = decompress_package(&archive)?;
+	let archive = decompress_package(&archive)?;
 
-    if archive.starts_with(b"!<arch>")
-    || archive.starts_with(b"!<thin>") {
-        return Ok(extract_ar(&archive)?);
-    }
-    if archive.len() > 262 && &archive[257..262] == b"ustar" {
-        return Ok(extract_tar(&archive)?);
-    }
-    
-    return Err(
-        "No valid archive type".to_string().into()
-    );
+	if archive.starts_with(b"!<arch>")
+	|| archive.starts_with(b"!<thin>") {
+		return Ok(extract_ar(&archive)?);
+	}
+	if archive.len() > 262 && &archive[257..262] == b"ustar" {
+		return Ok(extract_tar(&archive)?);
+	}
+
+	return Err(
+		"No valid archive type".to_string().into()
+	);
 }
 
 pub fn find_entry_as_regular<'a>(
-    entries: &'a Vec<Entry>,
-    cases: &[&str]
+	entries: &'a Vec<Entry>,
+	cases: &[&str]
 ) -> Result<&'a [u8], InvalidInput> {
-    return entries.iter()
-        .find_map(|entry| {
-            if cases.contains(&entry.path.as_str()) {
-                return if let EntryType::Regular(val) = &entry.data {
-                    Some(val.as_slice())
-                } else {
-                    None
-                }
-            } else {
-                return None;
-            }
-        })
-        .ok_or(InvalidInput::MissingData(
-            format!("Missing {} from archive", cases.join(", "))
-        ));
+	return entries.iter()
+		.find_map(|entry| {
+			if cases.contains(&entry.path.as_str()) {
+				return if let EntryType::Regular(val) = &entry.data {
+					Some(val.as_slice())
+				} else {
+					None
+				}
+			} else {
+				return None;
+			}
+		})
+		.ok_or(InvalidInput::MissingData(
+			format!("Missing {} from archive", cases.join(", "))
+		));
 }
 
 pub fn create_package(atom: &Atom)
 -> Vec<u8> {
-    let mut buffer: Vec<u8> = Vec::new();
-    let mut header = TarHeader::new_gnu();
-    let mut tar = TarBuilder::new(
-        GzEncoder::new(
-            &mut buffer,
-            Compression::default()
-        )
-    );
-    let metadata_string = serde_json::to_string_pretty(
-        &atom.metadata
-    ).unwrap();
-    
-    header.set_size(metadata_string.len() as u64);
-    header.set_mode(0o644);
-    tar.append_data(
-        &mut header,
-        "./metadata.json",
-        metadata_string
-            .as_str()
-            .as_bytes()
-    ).expect("Failed to append metadata to tar archive");
-    
-    for entry in &atom.entries {
-        let mut header = TarHeader::new_gnu();
+	let mut buffer: Vec<u8> = Vec::new();
+	let mut header = TarHeader::new_gnu();
+	let mut tar = TarBuilder::new(
+		GzEncoder::new(
+			&mut buffer,
+			Compression::default()
+		)
+	);
+	let metadata_string = serde_json::to_string_pretty(
+		&atom.metadata
+	).unwrap();
 
-        header.set_mode(entry.perm);
-        match &entry.data {
-            EntryType::Regular(data) => {
-                header.set_size(data.len() as u64);
-                tar.append_data(
-                    &mut header,
-                    &format!("./contents/{}", entry.path),
-                    &data[..]
-                ).expect(
-                    &format!("Failed to append {} to tar archive", entry.path)
-                );
-            },
-            EntryType::Symlink(target) => {
-                header.set_entry_type(tar::EntryType::Symlink);
-                header.set_link_name(target).expect(
-                    &format!(
-                        "Failed to set symlink {} in tar archive",
-                        entry.path
-                    )
-                );
-                header.set_size(0);
-                tar.append_data(
-                    &mut header,
-                    &format!("./contents/{}", entry.path),
-                    &[][..]
-                ).expect(
-                    &format!(
-                        "Failed to append symlink {} to tar archive",
-                        entry.path
-                    )
-                );
-            }
-        }
-    }
-    
-    tar.finish()
-        .expect("Failed to build tar archive");
-    drop(tar);
+	header.set_size(metadata_string.len() as u64);
+	header.set_mode(0o644);
+	tar.append_data(
+		&mut header,
+		"./metadata.json",
+		metadata_string
+			.as_str()
+			.as_bytes()
+	).expect("Failed to append metadata to tar archive");
 
-    return buffer;
+	for entry in &atom.entries {
+		let mut header = TarHeader::new_gnu();
+
+		header.set_mode(entry.perm);
+		match &entry.data {
+			EntryType::Regular(data) => {
+				header.set_size(data.len() as u64);
+				tar.append_data(
+					&mut header,
+					&format!("./contents/{}", entry.path),
+					&data[..]
+				).expect(
+					&format!("Failed to append {} to tar archive", entry.path)
+				);
+			},
+			EntryType::Symlink(target) => {
+				header.set_entry_type(tar::EntryType::Symlink);
+				header.set_link_name(target).expect(
+					&format!(
+						"Failed to set symlink {} in tar archive",
+						entry.path
+					)
+				);
+				header.set_size(0);
+				tar.append_data(
+					&mut header,
+					&format!("./contents/{}", entry.path),
+					&[][..]
+				).expect(
+					&format!(
+						"Failed to append symlink {} to tar archive",
+						entry.path
+					)
+				);
+			}
+		}
+	}
+
+	tar.finish()
+		.expect("Failed to build tar archive");
+	drop(tar);
+
+	return buffer;
 }
 
 pub fn parse_control(content: &str) -> Vec<(String, String)> {
-    let mut fields: Vec<(String, String)> = Vec::new();
+	let mut fields: Vec<(String, String)> = Vec::new();
 
-    for line in content.lines() {
-        if line.starts_with(' ') || line.starts_with('\t') {
-            if let Some((_, value)) = fields.last_mut() {
-                value.push('\n');
-                value.push_str(line.trim());
-            }
-        } else if let Some(colon_pos) = line.find(':') {
-            let field = line[..colon_pos].to_string();
-            let value = line[colon_pos+1..]
-                .trim()
-                .to_string();
-            fields.push((field, value));
-        }
-    }
+	for line in content.lines() {
+		if line.starts_with(' ') || line.starts_with('\t') {
+			if let Some((_, value)) = fields.last_mut() {
+				value.push('\n');
+				value.push_str(line.trim());
+			}
+		} else if let Some(colon_pos) = line.find(':') {
+			let field = line[..colon_pos].to_string();
+			let value = line[colon_pos+1..]
+				.trim()
+				.to_string();
+			fields.push((field, value));
+		}
+	}
 
-    return fields;
+	return fields;
 }
 
 pub fn safe_rm_file_dir(path: &str) -> Result<(), IOError> {
-    if Path::new(&path).is_file() || Path::new(&path).is_symlink() {
-        return remove_file(&path);
-    }
-    
-    return match remove_dir(&path) {
-        Err(e) if e.kind() == DirectoryNotEmpty => Ok(()),
-        rest => rest
-    };
+	if Path::new(&path).is_file() || Path::new(&path).is_symlink() {
+		return remove_file(&path);
+	}
+
+	return match remove_dir(&path) {
+		Err(e) if e.kind() == DirectoryNotEmpty => Ok(()),
+		rest => rest
+	};
 }
 
 pub fn safe_place_entry(entry: &Entry)
 -> Result<(), IOError> {
-    let parent = Path::new(&entry.path)
-        .parent()
-        .expect("invalid path");
+	let parent = Path::new(&entry.path)
+		.parent()
+		.expect("invalid path");
 
-    create_dir_all(parent)?;
-    match &entry.data {
-        EntryType::Regular(data) => {
-            write(
-                &entry.path,
-                &data
-            )?;
-            set_permissions(
-                &entry.path,
-                Permissions::from_mode(entry.perm)
-            )?;
-        },
-        EntryType::Symlink(target) => {
-            let _ = safe_rm_file_dir(&entry.path);
-            
-            symlink(&target, &entry.path)?;
-        }
-    }
+	create_dir_all(parent)?;
+	match &entry.data {
+		EntryType::Regular(data) => {
+			write(
+				&entry.path,
+				&data
+			)?;
+			set_permissions(
+				&entry.path,
+				Permissions::from_mode(entry.perm)
+			)?;
+		},
+		EntryType::Symlink(target) => {
+			let _ = safe_rm_file_dir(&entry.path);
 
-    return Ok(());
+			symlink(&target, &entry.path)?;
+		}
+	}
+
+	return Ok(());
 }
 
 pub fn parse_script(script: &str) -> Result<(String, String), InvalidInput> {
-    let (first, rest) = script.split_once("\n").ok_or(
-        InvalidInput::MissingData(
-            "No shibang was found".to_string()
-        )
-    )?;
-    if !first.starts_with("#!") {
-        return Err(
-            InvalidInput::MissingData(
-                "No shibang was found".to_string()
-            )
-        );
-    }
-    let path = first.trim_start_matches("#!");
-    let cmd_name = path.rsplit_once('/').ok_or(
-        InvalidInput::MissingData(
-            "Invalid shibang".to_string()
-        )
-    )?.1;
+	let (first, rest) = script.split_once("\n").ok_or(
+		InvalidInput::MissingData(
+			"No shibang was found".to_string()
+		)
+	)?;
+	if !first.starts_with("#!") {
+		return Err(
+			InvalidInput::MissingData(
+				"No shibang was found".to_string()
+			)
+		);
+	}
+	let path = first.trim_start_matches("#!");
+	let cmd_name = path.rsplit_once('/').ok_or(
+		InvalidInput::MissingData(
+			"Invalid shibang".to_string()
+		)
+	)?.1;
 
-    return Ok((
-        cmd_name.to_string(),
-        rest.to_string()
-    ));
+	return Ok((
+		cmd_name.to_string(),
+		rest.to_string()
+	));
 }
