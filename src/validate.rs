@@ -7,17 +7,27 @@ use crate::atom::AtomMetadata;
 use crate::group::Group;
 
 fn log_map_atom_to_entries(lock: &Lock, path: &str) {
-	for entry in map_atom_to_entries(lock, path, true, &["cache"]) {
+	let entries = map_atom_to_entries(lock, path, true, &["cache"]);
+
+	if !entries.is_empty(){
+		println!("Missing:");
+	}
+	for entry in entries {
 		if !Path::new(&entry).exists() {
-			println!("Missing: {}", entry);
+			println!("\t\"{}\"", entry);
 		}
 	}
 }
 
 fn log_map_to_lock(path: &str, lock: &Lock, ignore: &Lock)
 -> Result<(), IOError> {
-	for entry in map_entries_to_atom(path, lock, ignore, false)? {
-		println!("Extra: {}", entry);
+	let entries = map_entries_to_atom(path, lock, ignore, false)?;
+
+	if !entries.is_empty() {
+		println!("Extra:");
+	}
+	for entry in entries {
+		println!("\t\"{}\"", entry);
 	}
 
 	return Ok(());
@@ -40,7 +50,7 @@ fn map_to_atoms(groups: &Vec<Group>, atoms: &Vec<AtomMetadata>) {
 		for atom in &group.atoms {
 			if !file_atoms.contains(&atom.to_string()) {
 				println!(
-					"Group '{}' references non-existent atom '{}'",
+					"Group \"{}\" references non-existent package \"{}\"",
 					group.name,
 					atom
 				);
@@ -56,9 +66,12 @@ fn map_to_groups(atoms: &Vec<AtomMetadata>, groups: &Vec<Group>) {
 		.flatten()
 		.collect();
 
+	if !atoms.is_empty() {
+		println!("These packages are not in any group:")
+	}
 	for atom in atoms {
 		if !grouped_atoms.contains(&atom.name) {
-			println!("Atom '{}' is not in any group", &atom.name);
+			println!("\t\"{}\"", &atom.name);
 		}
 	}
 }
