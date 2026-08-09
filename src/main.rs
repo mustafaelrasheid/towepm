@@ -543,6 +543,24 @@ fn main() -> Result<(), InputError> {
 			if let Some(val) = &atom.maintainer {
 				println!("Maintainer: {}", val);
 			}
+			if let Some(val) = &atom.section {
+				println!("Section: {}", val)
+			}
+			if let Some(val) = &atom.priority {
+				println!("Priority: {}", val)
+			}
+			if let Some(val) = &atom.homepage {
+				println!("Homepage: {}", val)
+			}
+			if let Some(val) = &atom.depends {
+				println!("Depends: {}", val.join(", "))
+			}
+			if let Some(val) = &atom.copyright {
+				println!("Copyright: {}", val)
+			}
+			if let Some(val) = &atom.changelog {
+				println!("Changelog: {}", val)
+			}
 		},
 		Commands::Tag { package, group, lib_dir } => {
 			let mut group = get_group(&lib_dir, &group);
