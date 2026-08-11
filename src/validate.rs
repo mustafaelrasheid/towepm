@@ -66,7 +66,13 @@ fn map_to_groups(atoms: &Vec<AtomMetadata>, groups: &Vec<Group>) {
 		.flatten()
 		.collect();
 
-	if !atoms.is_empty() {
+	if !atoms
+		.iter()
+		.filter(|a|
+			!grouped_atoms
+				.contains(&a.name)
+		).collect::<Vec<&AtomMetadata>>()
+		.is_empty() {
 		println!("These packages are not in any group:")
 	}
 	for atom in atoms {
