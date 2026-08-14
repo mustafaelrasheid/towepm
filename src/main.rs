@@ -556,10 +556,12 @@ fn main() -> Result<(), InputError> {
 				println!("Depends: {}", val.join(", "))
 			}
 			if let Some(val) = &atom.copyright {
-				println!("Copyright: {}", val)
+				println!("Copyright:");
+				println!("{}", val);
 			}
 			if let Some(val) = &atom.changelog {
-				println!("Changelog: {}", val)
+				println!("Changelog:");
+				println!("{}", val);
 			}
 		},
 		Commands::Tag { package, group, lib_dir } => {
