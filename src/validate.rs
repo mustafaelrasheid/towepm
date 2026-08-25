@@ -7,15 +7,16 @@ use crate::atom::AtomMetadata;
 use crate::group::Group;
 
 fn log_map_atom_to_entries(lock: &Lock, path: &str) {
-	let entries = map_atom_to_entries(lock, path, true, &["cache"]);
+	let entries = map_atom_to_entries(lock, path, true, &["cache"])
+		.into_iter()
+		.filter(|entry| entry != "" && !Path::new(&entry).exists())
+		.collect::<Vec<String>>();
 
 	if !entries.is_empty(){
 		println!("Missing:");
 	}
 	for entry in entries {
-		if !Path::new(&entry).exists() {
-			println!("\t\"{}\"", entry);
-		}
+		println!("\t\"{}\"", entry);
 	}
 }
 
