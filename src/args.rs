@@ -16,27 +16,27 @@ pub struct Cli {
 #[derive(Subcommand)]
 pub enum Commands {
 	RebuildLock {
-		#[arg(long, default_value = "/var/lib/tower")]
+		#[arg(long, default_value = "/var/lib/tower", env = "TOWER_LIBDIR")]
 		lib_dir: String,
 	},
 	Validate {
-		#[arg(long, default_value = "/var/lib/tower")]
+		#[arg(long, default_value = "/var/lib/tower", env = "TOWER_LIBDIR")]
 		lib_dir: String,
-		#[arg(long, default_value = "")]
+		#[arg(long, default_value = "", env = "TOWER_ROOTDIR")]
 		root_dir: String,
 	},
 	Export {
 		packages: Vec<String>,
-		#[arg(long, default_value = "/var/lib/tower")]
+		#[arg(long, default_value = "/var/lib/tower", env = "TOWER_LIBDIR")]
 		lib_dir: String,
-		#[arg(long, default_value = "")]
+		#[arg(long, default_value = "", env = "TOWER_ROOTDIR")]
 		root_dir: String,
 	},
 	Install {
 		packages: Vec<String>,
-		#[arg(long, default_value = "/var/lib/tower")]
+		#[arg(long, default_value = "/var/lib/tower", env = "TOWER_LIBDIR")]
 		lib_dir: String,
-		#[arg(long, default_value = "")]
+		#[arg(long, default_value = "", env = "TOWER_ROOTDIR")]
 		root_dir: String,
 		#[arg(long)]
 		force: bool,
@@ -47,9 +47,9 @@ pub enum Commands {
 	},
 	Purge {
 		packages: Vec<String>,
-		#[arg(long, default_value = "/var/lib/tower")]
+		#[arg(long, default_value = "/var/lib/tower", env = "TOWER_LIBDIR")]
 		lib_dir: String,
-		#[arg(long, default_value = "")]
+		#[arg(long, default_value = "", env = "TOWER_ROOTDIR")]
 		root_dir: String,
 		#[arg(long)]
 		yes: bool,
@@ -66,34 +66,34 @@ pub enum Commands {
 	},
 	View {
 		package: String,
-		#[arg(long, default_value = "/var/lib/tower")]
+		#[arg(long, default_value = "/var/lib/tower", env = "TOWER_LIBDIR")]
 		lib_dir: String,
 	},
 	Tag {
 		package: String,
 		group: String,
-		#[arg(long, default_value = "/var/lib/tower")]
+		#[arg(long, default_value = "/var/lib/tower", env = "TOWER_LIBDIR")]
 		lib_dir: String,
 	},
 	Untag {
 		package: String,
 		group: String,
-		#[arg(long, default_value = "/var/lib/tower")]
+		#[arg(long, default_value = "/var/lib/tower", env = "TOWER_LIBDIR")]
 		lib_dir: String,
 	},
 	CreateGroup {
 		group: String,
-		#[arg(long, default_value = "/var/lib/tower")]
+		#[arg(long, default_value = "/var/lib/tower", env = "TOWER_LIBDIR")]
 		lib_dir: String,
 	},
 	ListGroup {
 		groups: Vec<String>,
-		#[arg(long, default_value = "/var/lib/tower")]
+		#[arg(long, default_value = "/var/lib/tower", env = "TOWER_LIBDIR")]
 		lib_dir: String,
 	},
 	DeleteGroup {
 		group: String,
-		#[arg(long, default_value = "/var/lib/tower")]
+		#[arg(long, default_value = "/var/lib/tower", env = "TOWER_LIBDIR")]
 		lib_dir: String,
 	},
 } 
