@@ -5,7 +5,7 @@ const NAME: &str = "towepm";
 
 #[derive(Parser)]
 #[command(name = NAME)]
-#[command(version = "0.1.0")]
+#[command(version)]
 #[command(author = "mustafaelrasheid")]
 #[command(
 	about = "Package manager for bricks",
