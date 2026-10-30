@@ -1,7 +1,13 @@
 [package]
 name = "towepm"
+description = "A package manager meant for flattening out complex dependency graphs to a simpler but larger format."
 version = "0.1.0"
 edition = "2024"
+homepage = "https://github.com/mustafaelrasheid/towepm"
+repository = "https://github.com/mustafaelrasheid/towepm"
+license = "MIT"
+keywords = ["debian"]
+categories = ["command-line-utilities"]
 
 [dependencies]
 ar = "0.9.0"
