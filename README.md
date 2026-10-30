@@ -1,9 +1,9 @@
-# Tower
+# Towepm
 A package manager meant for flattening out complex dependency graphs to a
 simpler but larger format.
 
-On more information on how to use tower, you can try installing the software
-and running it with --lib-dir describing where you want tower to place
+On more information on how to use towepm, you can try installing the software
+and running it with --lib-dir describing where you want towepm to place
 it's files and --root-dir on where do you want packages to be extracted and
 placed.
 
