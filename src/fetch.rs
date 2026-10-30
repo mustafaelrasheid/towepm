@@ -1,13 +1,11 @@
-use std::fs::{create_dir_all, read_to_string, write};
+use std::fs::{read_to_string, write};
 use std::path::Path;
 use std::io::Read;
-use crate::utils::{parse_control, decompress_package};
+use crate::utils::{parse_control, decompress_package, get_cache_dir};
 use crate::error::NetworkError;
 
 const PACKAGES_INDEX_URL: &str =
 	"https://deb.debian.org/debian/dists/stable/main/binary-amd64/Packages.gz";
-const CACHE_DIR: &str = "/tmp/tower";
-const PACKAGES_FILE: &str = "/tmp/tower/Packages";
 
 fn fetch_packages() -> Result<Vec<u8>, NetworkError> {
 	let mut compressed = Vec::new();
@@ -22,8 +20,10 @@ fn fetch_packages() -> Result<Vec<u8>, NetworkError> {
 }
 
 fn get_packages() -> Result<String, NetworkError> {
-	if Path::new(PACKAGES_FILE).exists() {
-		if let Ok(packages) = read_to_string(PACKAGES_FILE) {
+	let packages_file = format!("{}/Packages", get_cache_dir());
+	
+	if Path::new(&packages_file).exists() {
+		if let Ok(packages) = read_to_string(&packages_file) {
 			return Ok(packages);
 		}
 	}
@@ -31,13 +31,10 @@ fn get_packages() -> Result<String, NetworkError> {
 	let packages = decompress_package(
 		&fetch_packages()?
 	).expect("Failed to decompress Packages");
-    
-	if let Ok(_) = create_dir_all(CACHE_DIR) {
-		let _ = write(
-			PACKAGES_FILE,
-			&packages.clone()
-		);
-	};
+	let _ = write(
+		&packages_file,
+		&packages.clone()
+	);
 
 	return Ok(
 		String::from_utf8(packages)

@@ -27,6 +27,7 @@ use tar::{
 };
 use ar::Archive as ArArchive;
 use serde_json::{Value};
+use clap::{CommandFactory};
 use crate::error::{
 	ArchiveError,
 	InputError,
@@ -35,6 +36,7 @@ use crate::error::{
 };
 use crate::atom::{Atom, Entry, EntryType};
 use crate::lock::{Lock, DirectoryEntry};
+use crate::args::Cli;
 
 pub fn read_file_as_json(path: &str)
 -> Result<Value, InputError> {
@@ -510,4 +512,13 @@ pub fn parse_script(script: &str) -> Result<(String, String), InvalidInput> {
 		cmd_name.to_string(),
 		rest.to_string()
 	));
+}
+
+pub fn get_cache_dir() -> String {
+	let binding = Cli::command();
+	let command_name = binding.get_name();
+	let cache_dir = format!("/tmp/{}", command_name);
+	let _ = create_dir_all(&cache_dir);
+	
+	return cache_dir;
 }
